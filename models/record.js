@@ -19,9 +19,9 @@ const recordSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  invoiceNo: String, // No longer required
-  cashSaleNo: String, // No longer required
-  quotationNo: String, // No longer required
+  invoiceNo: String, 
+  cashSaleNo: String, 
+  quotationNo: String, 
   facilitator: {
     type: String,
     required: true
