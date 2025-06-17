@@ -160,7 +160,7 @@ app.post('/api/users/logout', async (req, res) => {
   }
 });
 
-app.post('/api/records/sync', async (req, res) => {
+/*app.post('/api/records/sync', async (req, res) => {
   try {
     const { records } = req.body;
 
@@ -184,11 +184,66 @@ app.post('/api/records/sync', async (req, res) => {
     console.error('[Sync][Error] Sync error:', error);
     res.status(400).send(error);
   }
+});*/
+app.post('/api/records/sync', async (req, res) => {
+  try {
+    const { records } = req.body;
+
+    console.log('[Sync] Received records:');
+    console.log(JSON.stringify(records, null, 2));
+
+    // Get all unique invoiceNo, cashSaleNo, and quotationNo values
+    const invoiceNos = records.map(r => r.invoiceNo).filter(Boolean);
+    const cashSaleNos = records.map(r => r.cashSaleNo).filter(Boolean);
+    const quotationNos = records.map(r => r.quotationNo).filter(Boolean);
+
+    // Find any already existing records
+    const existing = await Record.find({
+      $or: [
+        { invoiceNo: { $in: invoiceNos } },
+        { cashSaleNo: { $in: cashSaleNos } },
+        { quotationNo: { $in: quotationNos } }
+      ]
+    });
+
+    // Build sets for faster lookups
+    const existingInvoiceSet = new Set(existing.map(r => r.invoiceNo));
+    const existingCashSaleSet = new Set(existing.map(r => r.cashSaleNo));
+    const existingQuotationSet = new Set(existing.map(r => r.quotationNo));
+
+    // Filter out duplicates
+    const newRecords = records.filter(r => {
+      return !(
+        (r.invoiceNo && existingInvoiceSet.has(r.invoiceNo)) ||
+        (r.cashSaleNo && existingCashSaleSet.has(r.cashSaleNo)) ||
+        (r.quotationNo && existingQuotationSet.has(r.quotationNo))
+      );
+    });
+
+    // Prepare bulk ops
+    const bulkOps = newRecords.map(record => ({
+      updateOne: {
+        filter: { id: record.id },
+        update: { $set: record },
+        upsert: true
+      }
+    }));
+
+    if (bulkOps.length > 0) {
+      await Record.bulkWrite(bulkOps);
+    }
+
+    const syncedRecords = await Record.find(); // optionally filter this
+    res.send(syncedRecords);
+  } catch (error) {
+    console.error('[Sync][Error] Sync error:', error);
+    res.status(400).send(error);
+  }
 });
 
 
 // Get Records from Cloud
-app.get('/api/records', async (req, res) => {
+app.get('/api/records', async (req, res) => { 
   try {
     const records = await Record.find(); // Removed the filter
 
